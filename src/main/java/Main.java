@@ -1,13 +1,50 @@
-import java.io.File;
-import java.util.Arrays;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
+import java.io.*;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.List;
 
 public class Main {
-    public static void main(String[] args) throws Exception {
-        BooleanSearchEngine engine = new BooleanSearchEngine(new File("pdfs"));
-        System.out.println(engine.search("бизнес"));
+    static int port = 8989;
 
-        // здесь создайте сервер, который отвечал бы на нужные запросы
-        // слушать он должен порт 8989
-        // отвечать на запросы /{word} -> возвращённое значение метода search(word) в JSON-формате
+    public static void main(String[] args) {
+
+        try {
+            BooleanSearchEngine engine = new BooleanSearchEngine(new File("pdfs"));
+            List<PageEntry> resultList = engine.search("Бизнес");
+
+            for (PageEntry pageEntry : resultList) {
+                System.out.println(pageEntry.toString());
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        try (ServerSocket serverSocket = new ServerSocket(port)) {
+
+            BooleanSearchEngine engine = new BooleanSearchEngine(new File("pdfs"));
+            Gson gson = new GsonBuilder().create();
+
+            while (true) {
+                try (Socket clientSocket = serverSocket.accept();
+                     PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
+                     BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()))) {
+
+                    String word = in.readLine();
+                    List<PageEntry> page = engine.search(word);
+
+                    if (page == null) {
+                        out.println("Совпадения отсутствуют");
+                    }
+
+                    var json = gson.toJson(page);
+                    out.println(json);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }
